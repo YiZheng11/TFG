@@ -64,6 +64,7 @@ assembliesDownloader () {
 			link=`cat $projectName/data/index.txt | grep "$assemblyAccn" | cut -f9 | sed -s 's/ftp:/rsync:/g'`
 			echo -e "\tDownloading and decompressing $assemblyAccn..."
 			rsync -rt $link $projectName/data/assemblies/ &>> $projectName/log.txt
+   			sleep 0.34
 		else 
 			echo -e "\t$assemblyAccn already exists!"
 		fi
