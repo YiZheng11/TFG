@@ -66,15 +66,23 @@ def directory_to_database(directory, title):
     fastas = " ".join(map(str, directory.rglob("*.fna")))
 
     if fastas:
-        os.system(f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        if os.name == "posix": # Unix
+            command = f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
+        elif os.name == "nt": # Windows
+            command = f"type {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
+        else: # Others
+            print("The operating system used is not supported by this program")
+            command = None
+        
+        if command is not None:
+            subprocess.Popen(command, shell=True).wait()
+    
     return None
 
 if __name__ == "__main__":
     data_dir = f"{os.getcwd()}/data"
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    os.makedirs("data", exist_ok=True)
     
     get_assemblies("bradyrhizobium", data_dir, retmax=10000)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
-
