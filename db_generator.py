@@ -37,6 +37,12 @@ def get_assemblies(term, target_dir, retmax=0):
     for number in record["IdList"]:
         index = get_index(number)
         url = get_url(index)
+        
+        # Check if URL is None
+        if url is None:
+            print(f"No download URL found for assembly {number}. Skipping...")
+            continue
+        
         name = Path(url).name
         files = [f"{url}/{name}_genomic.fna.gz", f"{url}/{name}_genomic.gbff.gz"]
         for filename in files:
@@ -65,6 +71,10 @@ def directory_to_database(directory, title):
     directory = Path(directory)
     fastas = " ".join(map(str, directory.rglob("*.fna")))
 
+    #if fastas:
+    #    command = f"makeblastdb -title {title} -in \"{fastas}\" -out {directory}/{title} -parse_seqids -dbtype nucl"
+    #    subprocess.Popen(command, shell=True).wait()
+    
     if fastas:
         if os.name == "posix": # Unix
             command = f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
@@ -79,10 +89,33 @@ def directory_to_database(directory, title):
     
     return None
 
+def generate_multifasta(directory, title):
+    directory = Path(directory)
+    multifasta_file = open('f{title}.fasta', 'w')
+                           
+    for filename in os.listdir(directory):
+        if filename.endswith("genomic.gbff"):
+            genome_path = os.path.join(directory,filename)
+            records = SeqIO.parse(genome_path,"genbank")
+            assemblyAccn = filename[:15]
+            
+            for record in records:
+                contig = record.id
+                
+                for feature in record.features:
+                    if feature.type == "CDS":
+                        locus = feature.qualifiers["locus_tag"][0]
+                        try:
+                            protein = feature.qualifiers["translation"][0]
+                            multifasta_file.write(">"+assemblyAccn + "!" + contig+"@"+locus+"\n"+protein+"\n")
+                        except:
+                            continue
+
 if __name__ == "__main__":
-    data_dir = f"{os.getcwd()}/data"
-    os.makedirs("data", exist_ok=True)
+    data_dir = f"{os.getcwd()}/prueba"
+    os.makedirs("prueba", exist_ok=True)
     
-    get_assemblies("bradyrhizobium", data_dir, retmax=10000)
+    get_assemblies("bradyrhizobium", data_dir, retmax=20)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
+    generate_multifasta(data_dir, "bradyrhizobia")
