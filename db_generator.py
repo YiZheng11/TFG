@@ -90,8 +90,7 @@ def directory_to_database(directory, title):
     return None
 
 def generate_multifasta(directory, title):
-    directory = Path(directory)
-    multifasta_file = open('f{title}.fasta', 'w')
+    multifasta_file = open(f"{directory}/{title}.fasta", 'w')
                            
     for filename in os.listdir(directory):
         if filename.endswith("genomic.gbff"):
@@ -110,6 +109,7 @@ def generate_multifasta(directory, title):
                             multifasta_file.write(">"+assemblyAccn + "!" + contig+"@"+locus+"\n"+protein+"\n")
                         except:
                             continue
+    multifasta_file.close()
 
 if __name__ == "__main__":
     data_dir = f"{os.getcwd()}/prueba"
