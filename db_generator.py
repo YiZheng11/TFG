@@ -63,12 +63,12 @@ def directory_to_database(directory, title):
     fastas = " ".join(map(str, directory.rglob("*.fna")))
 
     if fastas:
-        os.system(f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
     return None
 
 if __name__ == "__main__":
     data_dir = f"{os.getcwd()}/data"
-    get_assemblies("bradyrhizobium", data_dir)
+    get_assemblies("mim1", data_dir)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
     
