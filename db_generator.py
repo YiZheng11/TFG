@@ -70,46 +70,11 @@ def directory_to_database(directory, title):
     "Recursively look for all fasta files in directory add build a blast db called <title> from them"
     directory = Path(directory)
     fastas = " ".join(map(str, directory.rglob("*.fna")))
-
-    #if fastas:
-    #    command = f"makeblastdb -title {title} -in \"{fastas}\" -out {directory}/{title} -parse_seqids -dbtype nucl"
-    #    subprocess.Popen(command, shell=True).wait()
     
     if fastas:
-        if os.name == "posix": # Unix
-            command = f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
-        elif os.name == "nt": # Windows
-            command = f"type {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
-        else: # Others
-            print("The operating system used is not supported by this program")
-            command = None
-        
-        if command is not None:
-            subprocess.Popen(command, shell=True).wait()
-    
+        os.system(f"cat {fastas} | makeblastdb -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
     return None
-
-def generate_multifasta(directory, title):
-    multifasta_file = open(f"{directory}/{title}.fasta", 'w')
-                           
-    for filename in os.listdir(directory):
-        if filename.endswith("genomic.gbff"):
-            genome_path = os.path.join(directory,filename)
-            records = SeqIO.parse(genome_path,"genbank")
-            assemblyAccn = filename[:15]
-            
-            for record in records:
-                contig = record.id
-                
-                for feature in record.features:
-                    if feature.type == "CDS":
-                        locus = feature.qualifiers["locus_tag"][0]
-                        try:
-                            protein = feature.qualifiers["translation"][0]
-                            multifasta_file.write(">"+assemblyAccn + "!" + contig+"@"+locus+"\n"+protein+"\n")
-                        except:
-                            continue
-    multifasta_file.close()
 
 if __name__ == "__main__":
     data_dir = f"{os.getcwd()}/prueba"
@@ -118,4 +83,3 @@ if __name__ == "__main__":
     get_assemblies("bradyrhizobium", data_dir, retmax=20)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
-    generate_multifasta(data_dir, "bradyrhizobia")
