@@ -28,15 +28,21 @@ def get_url(index):
 
     return None
 
-def get_assemblies(term, target_dir):
+def get_assemblies(term, target_dir, retmax=0):
     "Download to <target_dir> all fasta and genbank for assemblies matching <term>"
-    handle = Entrez.esearch(db="assembly", term=term)
+    handle = Entrez.esearch(db="assembly", term=term, retmax=retmax)
     record = Entrez.read(handle)
     print(f"Found {len(record['IdList'])} records matching {term}")
-    
+
     for number in record["IdList"]:
         index = get_index(number)
         url = get_url(index)
+        
+        # Check if URL is None
+        if url is None:
+            print(f"No download URL found for assembly {number}. Skipping...")
+            continue
+        
         name = Path(url).name
         files = [f"{url}/{name}_genomic.fna.gz", f"{url}/{name}_genomic.gbff.gz"]
         for filename in files:
@@ -53,9 +59,13 @@ def unzip_all(base_dir):
     for fn in base_dir.rglob("*.gz"):
         fn = Path(fn)
         print(f"Gunzipping {fn}")
-        with gzip.open(fn, "r") as zipped:
+
+        with gzip.open(fn, "rb") as zipped:
             with open(base_dir / fn.stem, "wb") as unzipped:
                 unzipped.write(zipped.read())
+        
+        # Delete the .gz file after successfully unzipping
+        fn.unlink()
 
 def directory_to_database(directory, title):
     "Recursively look for all fasta files in directory add build a blast db called <title> from them"
@@ -66,9 +76,34 @@ def directory_to_database(directory, title):
         os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
     return None
 
+
+def generate_multifasta(directory, title):
+    multifasta_file = open(f"{directory}/{title}.fasta", 'w')
+                           
+    for filename in os.listdir(directory):
+        if filename.endswith("genomic.gbff"):
+            genome_path = os.path.join(directory,filename)
+            records = SeqIO.parse(genome_path,"genbank")
+            assemblyAccn = filename[:15]
+            
+            for record in records:
+                contig = record.id
+                
+                for feature in record.features:
+                    if feature.type == "CDS":
+                        locus = feature.qualifiers["locus_tag"][0]
+                        try:
+                            protein = feature.qualifiers["translation"][0]
+                            multifasta_file.write(">"+assemblyAccn + "!" + contig+"@"+locus+"\n"+protein+"\n")
+                        except:
+                            continue
+    multifasta_file.close()
+
 if __name__ == "__main__":
-    data_dir = f"{os.getcwd()}/data"
-    get_assemblies("mim1", data_dir)
+    data_dir = f"{os.getcwd()}/prueba"
+    os.makedirs("prueba", exist_ok=True)
+    
+    get_assemblies("bradyrhizobium", data_dir, retmax=20)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
-    
+    generate_multifasta(data_dir, "bradyrhizobia")
