@@ -2,14 +2,16 @@ import os
 import urllib
 import gzip
 import pdb
-import subprocess
+import time
+#import subprocess
 
 from pathlib import Path
 
 from Bio import Entrez
-from Bio import SeqIO
+#from Bio import SeqIO
 
 Entrez.email = "yi.zheng@alumnos.upm.es" # your email please
+Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
 
 def get_index(number):
     "Return a NCBI summary of the assembly with id <number>"
@@ -50,6 +52,8 @@ def get_assemblies(term, target_dir, retmax=0):
             with urllib.request.urlopen(filename) as response:
                 with open(f"{target_dir}/{Path(filename).name}", "wb") as outfile:
                     outfile.write(response.read())
+        
+        time.sleep(0.1)  # Sleep for 10 requests per second aprox
 
     return None
 
@@ -78,6 +82,11 @@ def directory_to_database(directory, title):
 if __name__ == "__main__":
     data_dir = f"{os.getcwd()}/data"
     os.makedirs("data", exist_ok=True)
-    get_assemblies("bradyrhizobium", data_dir, retmax=20)
+    
+    organisms = ['Rhizobium', 'Bradyrhizobium', 'Mesorhizobium', 
+                 'Sinorhizobium', 'Neorhizobium', 'Georhizobium', 
+                 'Pararhizobium', 'Pseudorhizobium']
+    
+    get_assemblies('Rhizobium', data_dir, retmax=100000)
     unzip_all(data_dir)
     directory_to_database(data_dir, "bradyrhizobia_blastdb")
