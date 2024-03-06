@@ -10,20 +10,19 @@ from pathlib import Path
 
 from Bio import Entrez
 
-Entrez.email = "YOUR_EMAIL" # your email please
-Entrez.api_key = "YOUR_API_KEY"  # your API key
+Entrez.email = "yi.zheng@alumnos.upm.es" # your email please
+Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
 
 def get_index(number):
     "Return a NCBI summary of the assembly with id <number>"
     handle = Entrez.esummary(db="assembly", id=number, report="full")
-    time.sleep(0.15)
-    return Entrez.read(handle)
+    return Entrez.read(handle, validate=False) #To skip all tags that are not represented in the DTD
 
 def get_url(index):
     "Returns the url of the available download directory, trying each repo in <repos>"
     document_summary = index["DocumentSummarySet"]["DocumentSummary"][0]
     repos = ["RefSeq", "GenBank", "Assembly_rpt"]
-
+    
     for repo in repos:
         url = document_summary.get(f"FtpPath_{repo}", False)
         if url:
@@ -36,31 +35,37 @@ def get_assemblies(term, target_dir, retmax=0):
     handle = Entrez.esearch(db="assembly", term=term, retmax=retmax)
     record = Entrez.read(handle)
     print(f"Found {len(record['IdList'])} records matching {term}")
-    time.sleep(0.15)
-
+    
     for number in record["IdList"]:
         index = get_index(number)
         url = get_url(index)
         
-        # Check if URL is None
-        if url is None:
+        if url is None: # Check if there's no URL
             print(f"No download URL found for assembly {number}. Skipping...")
             continue
         
         name = Path(url).name
         files = [f"{url}/{name}_genomic.fna.gz", f"{url}/{name}_genomic.gbff.gz"]
-        for file_url in files: 
-            filename = Path(file_url).name
-            filepath = Path(target_dir) / filename
+        for file_url in files: # The code below is to download assemblies using the url
+            #if file_url.endswith('.gz'):
+                #filename = Path(file_url).name
+                #filepath = Path(target_dir) / filename
 
-            if not filepath.exists():
-                print(f"Downloading {filename} from NCBI")
-                with urllib.request.urlopen(url) as response:
-                    with open(filepath, "wb") as outfile:
-                        outfile.write(response.read())
-            else: # In case some of the assemblies have already been downloaded
-                print(f"Skipping {filename}, already exists")
-
+                #if not filepath.exists():
+                #    print(f"Downloading {filename} from NCBI")
+                #    with urllib.request.urlopen(url) as response:
+                #        with open(filepath, "wb") as outfile:
+                #            outfile.write(response.read())
+                #else: # In case some of the assemblies have already been downloaded
+                #    print(f"Skipping {filename}, already exists")
+                
+            print(f"Fetching {file_url} from NCBI")
+            with urllib.request.urlopen(file_url) as response:
+                with open(f"{target_dir}/{Path(file_url).name}", "wb") as outfile:
+                    outfile.write(response.read())
+                    time.sleep(0.15)
+            #else:
+                #print(f"Skipping {file_url}, it is not a .gz file")
     return None
 
 def get_assemblies_with_retry(term, target_dir, retmax=0, max_retries=20):
@@ -110,16 +115,14 @@ def directory_to_database(directory, title):
         os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
     return None
 
-if __name__ == "__main__":
-    data_dir = f"{os.getcwd()}/data"
-    os.makedirs("data", exist_ok=True)
-    
-    organisms = ['Rhizobium', 'Bradyrhizobium', 'Mesorhizobium', 
-                 'Sinorhizobium', 'Neorhizobium', 'Georhizobium', 
-                 'Pararhizobium', 'Pseudorhizobium']
-    
-    for organism in organisms:
-        get_assemblies_with_retry(organism, data_dir, retmax=100000)
-    
+def generate(term):
+    data_dir = f"{os.getcwd()}/{term}-data"
+    os.makedirs(f"{data_dir}", exist_ok=True)
+
+    get_assemblies_with_retry('Rhizobium OR Bradyrhizobium OR Mesorhizobium OR Sinorhizobium OR Neorhizobium OR Georhizobium OR Pararhizobium OR Pseudorhizobium',
+                              data_dir, retmax=100000)
     unzip_all(data_dir)
-    directory_to_database(data_dir, "rizobia_blastdb")
+    directory_to_database(data_dir, f"{term}_blastdb")
+
+if __name__ == "__main__":
+    generate("rizobia")
