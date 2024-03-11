@@ -4,7 +4,7 @@ import gzip
 import pdb
 import time
 from urllib.error import HTTPError 
-#import subprocess
+import subprocess
 
 from pathlib import Path
 
@@ -26,8 +26,10 @@ def get_url(index):
     for repo in repos:
         url = document_summary.get(f"FtpPath_{repo}", False)
         if url:
-            return url
-
+            if url.endswith('.txt'):
+                print(f"URL '{url}' does not point to a directory. Skipping...")
+            else:
+                return url
     return None
 
 def get_assemblies(term, target_dir, retmax=0):
@@ -46,8 +48,8 @@ def get_assemblies(term, target_dir, retmax=0):
         
         name = Path(url).name
         files = [f"{url}/{name}_genomic.fna.gz", f"{url}/{name}_genomic.gbff.gz"]
-        for file_url in files: # The code below is to download assemblies using the url
-            #if file_url.endswith('.gz'):
+        for file_url in files: # The code below is to download assemblies using the url (NEED TO CHECK)
+            if file_url.endswith('.gz'):
                 #filename = Path(file_url).name
                 #filepath = Path(target_dir) / filename
 
@@ -59,13 +61,13 @@ def get_assemblies(term, target_dir, retmax=0):
                 #else: # In case some of the assemblies have already been downloaded
                 #    print(f"Skipping {filename}, already exists")
                 
-            print(f"Fetching {file_url} from NCBI")
-            with urllib.request.urlopen(file_url) as response:
-                with open(f"{target_dir}/{Path(file_url).name}", "wb") as outfile:
-                    outfile.write(response.read())
-                    time.sleep(0.15)
-            #else:
-                #print(f"Skipping {file_url}, it is not a .gz file")
+                print(f"Fetching {file_url} from NCBI")
+                with urllib.request.urlopen(file_url) as response:
+                    with open(f"{target_dir}/{Path(file_url).name}", "wb") as outfile:
+                        outfile.write(response.read())
+                        time.sleep(0.15)
+            else:
+                print(f"Skipping {file_url}, it is not a .gz file")
     return None
 
 def get_assemblies_with_retry(term, target_dir, retmax=0, max_retries=20):
@@ -104,24 +106,28 @@ def unzip_all(base_dir):
 def directory_to_database(directory, title):
     "Recursively look for all fasta files in directory add build a blast db called <title> from them"
     directory = Path(directory)
-    fastas = " ".join(map(str, directory.rglob("*.fna")))
+    #fastas = " ".join(map(str, directory.rglob("*.fna")))
     
-    #if fastas:
-    #    command = f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
-    #    if command is not None:
-    #        subprocess.Popen(command, shell=True).wait()
-    
+    fastas = directory.rglob("*.fna")
     if fastas:
-        os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        #os.system(f"makeblastdb -in {fastas} -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        #command = f"makeblastdb -in \"{fastas}\" -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
+        command = ["makeblastdb", "-in", "-", "-title", title, "-out", f"{directory}/{title}", "-parse_seqids", "-dbtype", "nucl"]
+        with subprocess.Popen(command, stdin=subprocess.PIPE) as process:
+            for fasta in fastas:
+                with open(fasta, 'rb') as f:
+                    process.stdin.write(f.read())
+    #    process.stdin.close()
+    
     return None
 
 def generate(term):
     data_dir = f"{os.getcwd()}/{term}-data"
     os.makedirs(f"{data_dir}", exist_ok=True)
-
-    get_assemblies_with_retry('Rhizobium OR Bradyrhizobium OR Mesorhizobium OR Sinorhizobium OR Neorhizobium OR Georhizobium OR Pararhizobium OR Pseudorhizobium',
-                              data_dir, retmax=100000)
-    unzip_all(data_dir)
+    
+    #get_assemblies_with_retry('Rhizobium OR Bradyrhizobium OR Mesorhizobium OR Sinorhizobium OR Neorhizobium OR Georhizobium OR Pararhizobium OR Pseudorhizobium',
+    #                          data_dir, retmax=100000)
+    #unzip_all(data_dir)
     directory_to_database(data_dir, f"{term}_blastdb")
 
 if __name__ == "__main__":
