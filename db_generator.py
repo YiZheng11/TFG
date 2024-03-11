@@ -106,19 +106,20 @@ def unzip_all(base_dir):
 def directory_to_database(directory, title):
     "Recursively look for all fasta files in directory add build a blast db called <title> from them"
     directory = Path(directory)
-    #fastas = " ".join(map(str, directory.rglob("*.fna")))
-    
     fastas = directory.rglob("*.fna")
+    processed_ids = {}
+    
     if fastas:
-        #os.system(f"makeblastdb -in {fastas} -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
-        #command = f"makeblastdb -in \"{fastas}\" -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl"
         command = ["makeblastdb", "-in", "-", "-title", title, "-out", f"{directory}/{title}", "-parse_seqids", "-dbtype", "nucl"]
         with subprocess.Popen(command, stdin=subprocess.PIPE) as process:
             for fasta in fastas:
-                with open(fasta, 'rb') as f:
-                    process.stdin.write(f.read())
-    #    process.stdin.close()
-    
+                for record in SeqIO.parse(fasta, "fasta"):
+                    record_id = record.id
+                    if record_id not in processed_ids:
+                        process.stdin.write(record.format("fasta").encode())
+                        processed_ids[record_id] = 1
+                    else:
+                        processed_ids[record_id] += 1
     return None
 
 def generate(term):
