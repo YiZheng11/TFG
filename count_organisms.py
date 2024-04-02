@@ -6,6 +6,7 @@ def count(filename, num_queries):
     count = 0
     
     with open(filename, 'r') as file:
+        file.readline()
         for line in file:
             columns = line.strip().split('\t')
             organism_id = columns[1]
