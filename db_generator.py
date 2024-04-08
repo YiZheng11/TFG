@@ -2,30 +2,34 @@ import os
 import urllib
 import gzip
 import pdb
+import time
+from urllib.error import HTTPError 
 import subprocess
 
 from pathlib import Path
 
 from Bio import Entrez
-from Bio import SeqIO
 
 Entrez.email = "lewis.grozinger@upm.es" # your email please
+Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
 
 def get_index(number):
     "Return a NCBI summary of the assembly with id <number>"
     handle = Entrez.esummary(db="assembly", id=number, report="full")
-    return Entrez.read(handle)
+    return Entrez.read(handle, validate=False) #To skip all tags that are not represented in the DTD
 
 def get_url(index):
     "Returns the url of the available download directory, trying each repo in <repos>"
     document_summary = index["DocumentSummarySet"]["DocumentSummary"][0]
     repos = ["RefSeq", "GenBank", "Assembly_rpt"]
-
+    
     for repo in repos:
         url = document_summary.get(f"FtpPath_{repo}", False)
         if url:
-            return url
-
+            if url.endswith('.txt'):
+                print(f"URL '{url}' does not point to a directory. Skipping...")
+            else:
+                return url
     return None
 
 def get_assemblies(term, target_dir, retmax=0):
@@ -33,25 +37,58 @@ def get_assemblies(term, target_dir, retmax=0):
     handle = Entrez.esearch(db="assembly", term=term, retmax=retmax)
     record = Entrez.read(handle)
     print(f"Found {len(record['IdList'])} records matching {term}")
-
+    
     for number in record["IdList"]:
         index = get_index(number)
         url = get_url(index)
         
-        # Check if URL is None
-        if url is None:
+        if url is None: # Check if there's no URL
             print(f"No download URL found for assembly {number}. Skipping...")
             continue
         
         name = Path(url).name
         files = [f"{url}/{name}_genomic.fna.gz", f"{url}/{name}_genomic.gbff.gz"]
-        for filename in files:
-            print(f"Fetching {filename} from NCBI")
-            with urllib.request.urlopen(filename) as response:
-                with open(f"{target_dir}/{Path(filename).name}", "wb") as outfile:
-                    outfile.write(response.read())
-                    
+        for file_url in files: # The code below is to download assemblies using the url (NEED TO CHECK)
+            if file_url.endswith('.gz'):
+                #filename = Path(file_url).name
+                #filepath = Path(target_dir) / filename
+
+                #if not filepath.exists():
+                #    print(f"Downloading {filename} from NCBI")
+                #    with urllib.request.urlopen(url) as response:
+                #        with open(filepath, "wb") as outfile:
+                #            outfile.write(response.read())
+                #else: # In case some of the assemblies have already been downloaded
+                #    print(f"Skipping {filename}, already exists")
+                
+                print(f"Fetching {file_url} from NCBI")
+                with urllib.request.urlopen(file_url) as response:
+                    with open(f"{target_dir}/{Path(file_url).name}", "wb") as outfile:
+                        outfile.write(response.read())
+                        time.sleep(0.15)
+            else:
+                print(f"Skipping {file_url}, it is not a .gz file")
     return None
+
+def get_assemblies_with_retry(term, target_dir, retmax=0, max_retries=20):
+    "Download to <target_dir> all fasta and genbank for assemblies matching <term>, with retry"
+    retries = 0
+    success = False
+
+    while not success and retries < max_retries:
+        try:
+            get_assemblies(term, target_dir, retmax)
+            success = True
+        except HTTPError as e:
+            if e.code == 500:  # Internal Server Error
+                print("Internal Server Error, retrying again in 60 seconds...")
+                time.sleep(60)
+                retries += 1
+            else:
+                raise  # If it is not an Internal Server Error, it shows the exception/error captured
+
+    if not success:
+        print(f"Failed to download the assemblies for {term} after {max_retries} retries.")
 
 def unzip_all(base_dir):
     "Use gunzip to decompress all gzipped files under <base_dir>"
@@ -70,40 +107,30 @@ def unzip_all(base_dir):
 def directory_to_database(directory, title):
     "Recursively look for all fasta files in directory add build a blast db called <title> from them"
     directory = Path(directory)
-    fastas = " ".join(map(str, directory.rglob("*.fna")))
-
+    fastas = directory.rglob("*.fna")
+    processed_ids = {}
+    
     if fastas:
-        os.system(f"makeblastdb -in '{fastas}' -title {title} -out {directory}/{title} -parse_seqids -dbtype nucl")
+        command = ["makeblastdb", "-in", "-", "-title", title, "-out", f"{directory}/{title}", "-parse_seqids", "-dbtype", "nucl"]
+        with subprocess.Popen(command, stdin=subprocess.PIPE) as process:
+            for fasta in fastas:
+                for record in SeqIO.parse(fasta, "fasta"):
+                    record_id = record.id
+                    if record_id not in processed_ids:
+                        process.stdin.write(record.format("fasta").encode())
+                        processed_ids[record_id] = 1
+                    else:
+                        processed_ids[record_id] += 1
     return None
 
-
-def generate_multifasta(directory, title):
-    multifasta_file = open(f"{directory}/{title}.fasta", 'w')
-                           
-    for filename in os.listdir(directory):
-        if filename.endswith("genomic.gbff"):
-            genome_path = os.path.join(directory,filename)
-            records = SeqIO.parse(genome_path,"genbank")
-            assemblyAccn = filename[:15]
-            
-            for record in records:
-                contig = record.id
-                
-                for feature in record.features:
-                    if feature.type == "CDS":
-                        locus = feature.qualifiers["locus_tag"][0]
-                        try:
-                            protein = feature.qualifiers["translation"][0]
-                            multifasta_file.write(">"+assemblyAccn + "!" + contig+"@"+locus+"\n"+protein+"\n")
-                        except:
-                            continue
-    multifasta_file.close()
+def generate(term):
+    data_dir = f"{os.getcwd()}/{term}-data"
+    os.makedirs(f"{data_dir}", exist_ok=True)
+    
+    #get_assemblies_with_retry('Rhizobium OR Bradyrhizobium OR Mesorhizobium OR Sinorhizobium OR Neorhizobium OR Georhizobium OR Pararhizobium OR Pseudorhizobium',
+    #                          data_dir, retmax=100000)
+    #unzip_all(data_dir)
+    directory_to_database(data_dir, f"{term}_blastdb")
 
 if __name__ == "__main__":
-    data_dir = f"{os.getcwd()}/prueba"
-    os.makedirs("prueba", exist_ok=True)
-    
-    get_assemblies("bradyrhizobium", data_dir, retmax=20)
-    unzip_all(data_dir)
-    directory_to_database(data_dir, "bradyrhizobia_blastdb")
-    generate_multifasta(data_dir, "bradyrhizobia")
+    generate("rizobia")
