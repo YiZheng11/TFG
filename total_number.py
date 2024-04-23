@@ -9,7 +9,7 @@ def number_organism(directory):
             number_files += 1
             file = os.path.join(directory, file)
             for record in SeqIO.parse(file, "fasta"):
-                if "Rhizobium" in record.description:
+                if "Rhizobium" in record.description or "Agrobacterium" in record.description:
                     rhizobium += 1
                     break
                 elif "Bradyrhizobium" in record.description:
@@ -18,7 +18,7 @@ def number_organism(directory):
                 elif "Mesorhizobium" in record.description:
                     mesorhizobium += 1
                     break
-                elif "Sinorhizobium" in record.description:
+                elif "Sinorhizobium" in record.description or "Ensifer" in record.description:
                     sinorhizobium += 1
                     break
                 else:
