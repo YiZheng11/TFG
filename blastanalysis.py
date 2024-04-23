@@ -11,7 +11,7 @@ Entrez.email = "yi.zheng@alumnos.upm.es" # your email please
 Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
 
 def blast_data(query, db_name, output_path):
-    command = f"tblastn -query {query} -db {db_name} -outfmt 5 -max_target_seqs '2000' -out {output_path}"
+    command = f"tblastn -query {query} -db {db_name} -outfmt 5 -max_target_seqs '8000' -out {output_path}"
     
     if command is not None:
         subprocess.Popen(command, shell=True).wait()
