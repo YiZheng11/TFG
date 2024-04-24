@@ -9,10 +9,10 @@ def profile_db(PSSM_file, output):
     "Create profile db with the PSSMs named in <PSSM_file> and saved it in <output>"
     command = f"makeprofiledb -in {PSSM_file} -out {output}"
 
-    if command is not None:
+    try:
         subprocess.Popen(command, shell=True).wait()
         print(f"Check out {output} where the db is saved.")
-    else:
+    except:
         print("Error, makeprofiledb couldn't be done, please check.")
 
 def create_multifasta(directory, genus):
@@ -47,11 +47,9 @@ def rpsblast(directory, profile_db, output_name, genus):
     directory = Path(directory)
     temp_multifasta_file = create_multifasta(directory, genus)
 
-    command = ["rpsblast", "-query", f"temp_multifasta_{genus}", "-db", profile_db, "-out", output_name, "-outfmt", "5", "-max_target_seqs", "8000", "-evalue", "0.01"]
-    #command = f"rpsblast -query {temp_multifasta_file} -db {profile_db} -out {output_name} -outfmt 5 -max_target_seqs '8000' -evalue 0.01"
+    command = ["rpsblast", "-query", f"temp_multifasta_{genus}", "-db", profile_db, "-out", output_name, "-outfmt", "5", "-max_target_seqs", "8000", "-evalue", "0.00001"]
     
-    process = subprocess.Popen(command, stderr=subprocess.PIPE)
-    _, stderr = process.communicate()
+    process = process = subprocess.run(command)
 
     # Remove the temporary multifasta file
     #Path("tmpebuzvxfx").unlink()
