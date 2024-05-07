@@ -12,7 +12,8 @@ class Accession:
         self.path = path_filename
         self.name = ""
         self.loci = []
-        self.isplasmid = [] 
+        self.isplasmid = []
+        self.host = ""
     
         records = parse(self.path, "genbank")
         for record in records:
@@ -24,6 +25,12 @@ class Accession:
                         self.isplasmid.append(True)
                     else:
                         self.isplasmid.append(False)
+                    
+                    host = feature.qualifiers.get("host", None)
+                    if host:
+                        self.host = host[0]
+                    else:
+                        self.host = "Unknown"
                 
                     strain = feature.qualifiers.get("strain", None)
                     if strain:
@@ -46,6 +53,9 @@ def create_objs(directory):
     for gb_file in Path(directory).rglob("*.gbff"):
         print(f"Creating obj for {gb_file.name}")
         objs.append(Accession(gb_file.name, gb_file))
+        
+    with open('accessions.pkl', 'wb') as file:
+            pickle.dump(objs, file)
 
 if __name__ == "__main__":
     nodABC_file = f"{os.getcwd()}/rizobia-blast/tblastnResult_nodABC.xml"
