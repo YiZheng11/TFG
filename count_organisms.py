@@ -1,95 +1,58 @@
 import os
+import pickle
+
+from pathlib import Path
 from Bio.Blast import NCBIXML
-from Bio import SeqIO, Entrez
+from Bio.SeqIO import parse
+from Bio import SeqIO
 
-Entrez.email = "yi.zheng@alumnos.upm.es" # your email please
-Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
+class Accession:
+    def __init__(self, accession, path_filename):
+        self.accession = accession
+        self.path = path_filename
+        self.name = ""
+        self.loci = []
+        self.isplasmid = [] 
     
-class Organism:
-    def __init__(self):
-        self.organisms = {}
-
-    def add_organism(self, name, queries=None):
-        if queries is None:
-            queries = set()  
-        if name in self.organisms:
-            self.organisms[name].update(queries)
-        else:
-            self.organisms[name] = set(queries)
-
-    def count_organisms(self, genus, required_queries=None):
-        count = 0
-        for organism, queries in self.organisms.items():
-            if genus in organism and (required_queries is None or queries.intersection(required_queries) == required_queries):
-                count += 1
-        return count
-
-def parse_xml(filename, organism_collection, queries=None):
-    result_handle = open(filename)
-    blast_records = NCBIXML.parse(result_handle)
-    for blast_record in blast_records:
-        for alignment in blast_record.alignments:
-            for hsp in alignment.hsps:
-                hit_accession = alignment.accession
-                species, strain, isolate = get_hit_info(hit_accession)
-                organism_name = species
-                if strain and strain not in species:
-                    organism_name += f" {strain}"
-                if isolate and isolate not in species:
-                    organism_name += f" {isolate}"
-                print(organism_name)
+        records = parse(self.path, "genbank")
+        for record in records:
+            self.loci.append(record.id)
+            for feature in record.features:
+                if feature.type == "source":
+                    plasmid = feature.qualifiers.get("plasmid", None)
+                    if plasmid:
+                        self.isplasmid.append(True)
+                    else:
+                        self.isplasmid.append(False)
                 
-                query_name = None
-                if queries:
-                    for query in queries:
-                        if query in blast_record.query:
-                            query_name = query
-                            organism_collection.add_organism(organism_name, query_name)
-                else:
-                    organism_collection.add_organism(organism_name)
+                    strain = feature.qualifiers.get("strain", None)
+                    if strain:
+                        strain = strain[0]
                 
-                break  # Solo necesitamos la información del primer HSP
-    result_handle.close()
+                    isolate = feature.qualifiers.get("isolate", None)
+                    if isolate:
+                        isolate = isolate[0]
+        
+            species = record.annotations.get("organism")
+            if strain and strain not in species:
+                species += f" strain {strain}"
+            if isolate and isolate not in species:
+                species += f" isolate {isolate}"
+            self.name = species
 
-def get_hit_info(hit_accession):
-    species = None; strain = None; isolate = None
-    try:
-        handle = Entrez.efetch(db="nuccore", id=hit_accession, rettype="gb", retmode="text")
-        record = SeqIO.read(handle, "genbank")
-        handle.close()
-        species = record.annotations.get("organism", "Unknown species")
-        for feature in record.features:
-            if feature.type == "source":
-                strain = feature.qualifiers.get("strain", None)
-                if strain:
-                    strain = strain[0]
-                isolate = feature.qualifiers.get("isolate", None)
-                if isolate:
-                    isolate = isolate[0]
-                break
-    except Exception as e:
-        print("Error:", e)
-    return species, strain, isolate
+def create_objs(directory):
+    directory = Path(directory)
+    objs = list()
+    for gb_file in Path(directory).rglob("*.gbff"):
+        print(f"Creating obj for {gb_file.name}")
+        objs.append(Accession(gb_file.name, gb_file))
 
 if __name__ == "__main__":
     nodABC_file = f"{os.getcwd()}/rizobia-blast/tblastnResult_nodABC.xml"
     nifH_file = f"{os.getcwd()}/rizobia-blast/tblastnResult_nifH.xml"
     T6SS_file = f"{os.getcwd()}/rizobia-blast/tblastnResult_T6SS.xml"
+
+    data_dir = os.path.join(os.getcwd(), "rizobia-data")
     
-    organism_collection_nifH = Organism()
-    parse_xml(nifH_file, organism_collection_nifH)
     genera = ["Rhizobium", "Bradyrhizobium", "Mesorhizobium", "Sinorhizobium"]
-    for genus in genera: 
-        #organism_collection_nodABC = Organism()
-        #parse_xml(nodABC_file, organism_collection_nodABC, data_dir, ["NodA", "NodB", "NodC"])
-        #num_organisms_nodABC = organism_collection_nodABC.count_organisms(genus, {"NodA", "NodB", "NodC"})
-
-        num_organisms_nifH = organism_collection_nifH.count_organisms(genus)
-
-        #organism_collection_T6SS = Organism()
-        #parse_xml(T6SS_file, organism_collection_T6SS, data_dir)
-        #num_organisms_T6SS = organism_collection_T6SS.count_organisms(genus)
-
-        #print(f"{genus} nodABC: {num_organisms_nodABC}")
-        print(f"{genus} nifH: {num_organisms_nifH}")
-        #print(f"{genus} T6SS: {num_organisms_T6SS}")
+    create_objs(data_dir)
