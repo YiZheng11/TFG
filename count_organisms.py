@@ -1,5 +1,8 @@
 import os
 import pickle
+import pdb
+import csv
+import pandas as pd
 
 from pathlib import Path
 from Bio.SeqIO import parse
@@ -13,6 +16,14 @@ class Accession:
         self.loci = []
         self.isplasmid = []
         self.host = ""
+        #level of assembly? -> Could not find it in gb file
+
+        self.nodA = False
+        self.nodB = False
+        self.nodC = False
+        self.nif = False
+        self.tssB = False
+        self.tssC = False
     
         records = parse(self.path, "genbank")
         for record in records:
@@ -82,6 +93,114 @@ def parse_blast(blast_xml, pickle_file):
     with open("nodC_species", "w") as nodC_file:
         for organism in nodC:
             nodC_file.write(organism+"\n")
+
+def table_genes(objs):
+    nodABC = set()
+    nif = set()
+    tssBC = set()
+    rizobio = set()
+    rizobio_T6SS = set()
+    all_species = set()
+    
+    for obj in objs:
+        all_species.add(obj.name)
+        if obj.nodA == True and obj.nodB == True and obj.nodC == True:
+            nodABC.add(obj.name)
+            
+        if obj.nif == True:
+            nif.add(obj.name)
+        
+        if obj.tssB == True and obj.tssC == True:
+            tssBC.add(obj.name)
+            
+        if obj.nodA == True and obj.nodB == True and obj.nodC == True and obj.nif == True:
+            rizobio.add(obj.name)
+        
+        if obj.nodA == True and obj.nodB == True and obj.nodC == True and obj.nif == True and obj.tssB == True and obj.tssC == True:
+            rizobio_T6SS.add(obj.name)
+            
+    #rizobio = nodABC.intersection(nif)
+    #rizobio_T6SS = nodABC.intersection(nif, tssBC)
+        
+    with open("species_nodABC", "w") as nodABC_file:
+        nodABC_file.write("Organism\tnPlasmids\tHost\tAccession\n")
+        for organism in nodABC:
+            nodABC_file.write(organism+"\t")
+            for obj in objs:
+                if obj.name == organism:
+                    nodABC_file.write(str(sum(obj.isplasmid))+"\t"+obj.host+"\t"+obj.accession+"\n")
+            
+    with open("species_nif", "w") as nif_file:
+        nif_file.write("Organism\tnPlasmids\tHost\tAccession\n")
+        for organism in nif:
+            nif_file.write(organism+"\t")
+            for obj in objs:
+                if obj.name == organism:
+                    nif_file.write(str(sum(obj.isplasmid))+"\t"+obj.host+"\t"+obj.accession+"\n")
+                    
+    with open("species_tssBC", "w") as tssBC_file:
+        tssBC_file.write("Organism\tnPlasmids\tHost\tAccession\n")
+        for organism in tssBC:
+            tssBC_file.write(organism+"\t")
+            for obj in objs:
+                if obj.name == organism:
+                    tssBC_file.write(str(sum(obj.isplasmid))+"\t"+obj.host+"\t"+obj.accession+"\n")
+                    
+    with open("species_rizobio", "w") as rizobio_file:
+        rizobio_file.write("Organism\tnPlasmids\tHost\tAccession\n")
+        for organism in rizobio:
+            rizobio_file.write(organism+"\t")
+            for obj in objs:
+                if obj.name == organism:
+                    rizobio_file.write(str(sum(obj.isplasmid))+"\t"+obj.host+"\t"+obj.accession+"\n")
+            
+    with open("species_rizobio_T6SS", "w") as rizobio_T6SS_file:
+        rizobio_T6SS_file.write("Organism\tnPlasmids\tHost\tAccession\n")
+        for organism in rizobio_T6SS:
+            rizobio_T6SS_file.write(organism+"\t")
+            for obj in objs:
+                if obj.name == organism:
+                    rizobio_T6SS_file.write(str(sum(obj.isplasmid))+"\t"+obj.host+"\t"+obj.accession+"\n")
+                    
+    with open("species_all", "w") as all_file:
+        for organism in all_species:
+            all_file.write(organism+"\n")
+    
+    
+    files = ["species_nodABC", "species_nif", "species_rizobio", "species_tssBC", "species_rizobio_T6SS"]
+    table = []
+    
+    headers = ['Genus', 'nodABC', 'nifH', 'rizobios', 'tssBC', 'rizobios con T6SS']
+    index = ["Rhizobium", "Bradyrhizobium", "Mesorhizobium", "Sinorhizobium"]
+    for file in files:
+        column = []
+        species_file = os.path.join(os.getcwd(), f"{file}")
+        rhizobium, bradyrhizobium, mesorhizobium, sinorhizobium, total, extra = number_genus(species_file)
+        print(total, extra)
+        column = [rhizobium, bradyrhizobium, mesorhizobium, sinorhizobium]
+        table.append(column)
+    df = pd.DataFrame(zip(*table))
+    df.insert(0, "Genus", index)
+    df.to_csv("table.tsv", sep = '\t', header=headers, index=False)
+
+def number_genus(file):
+    rhizobium, bradyrhizobium, mesorhizobium, sinorhizobium = 0, 0, 0, 0
+    total, extra = 0, 0
+    with open(f"{file}", "r") as species_file:
+        for line in species_file:
+            total += 1
+            column_1 = line.split("\t")[0] #The first column contains the species name
+            if "Rhizobium" in column_1 or "Agrobacterium" in column_1:
+                rhizobium += 1
+            elif "Bradyrhizobium" in column_1:
+                bradyrhizobium += 1
+            elif "Mesorhizobium" in column_1:
+                mesorhizobium += 1
+            elif "Sinorhizobium" in column_1 or "Ensifer" in column_1:
+                sinorhizobium += 1
+            else:
+                extra += 1 #Check the lines in the file where the fist column doesn't have the species name
+    return rhizobium, bradyrhizobium, mesorhizobium, sinorhizobium, total, extra
 
 if __name__ == "__main__":
     rizobia_blast = os.path.join(os.getcwd(), "rizobia-blast")
