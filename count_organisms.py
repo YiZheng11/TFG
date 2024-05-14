@@ -208,12 +208,13 @@ if __name__ == "__main__":
     nodB_file = os.path.join(rizobia_blast, "tblastnResult_nodB.xml")
     nodC_file = os.path.join(rizobia_blast, "tblastnResult_nodC.xml")
     nifH_file = os.path.join(rizobia_blast, "tblastnResult_nifH.xml")
-    T6SS_file = os.path.join(rizobia_blast, "tblastnResult_T6SS.xml")
-
+    tssB_file = os.path.join(rizobia_blast, "tblastnResult_tssB.xml")
+    tssC_file = os.path.join(rizobia_blast, "tblastnResult_tssC.xml")
+    
     data_dir = os.path.join(os.getcwd(), "rizobia-data")
     pickle_file = os.path.join(os.getcwd(), "accessions.pkl")
     
-    genera = ["Rhizobium", "Bradyrhizobium", "Mesorhizobium", "Sinorhizobium"]
     #create_objs(data_dir, pickle_file)
     objs = load_pickle_file(pickle_file)
-    parse_blast(nodC_file, pickle_file)
+    #parse_blast(nodC_file, pickle_file)
+    table_genes(objs)
