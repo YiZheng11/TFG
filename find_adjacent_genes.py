@@ -98,15 +98,15 @@ def find_adjacent_genes(gene_positions, target_start, target_end):
             target_index = i
             break
     if target_index is not None:
-        # Get up to 3 genes to the left
+        # Get up to 3 genes upstream
         upstream = sorted_genes[target_index-3:target_index]
-        # Get up to 3 genes to the right
+        # Get up to 3 genes downstream
         downstream = sorted_genes[target_index+1:target_index+4]
 
-    left_adjacent_genes = [GO for start, end, GO in upstream]
-    right_adjacent_genes = [GO for start, end, GO in downstream]
+    upstream_genes = [GO for start, end, GO in upstream]
+    downstream_genes = [GO for start, end, GO in downstream]
 
-    return left_adjacent_genes, right_adjacent_genes
+    return upstream_genes, downstream_genes
 
 if __name__ == "__main__":
     rizobia_blast = os.path.join(os.getcwd(), "rizobia-blast")
