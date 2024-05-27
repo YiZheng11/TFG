@@ -1,5 +1,6 @@
 import os
 import pickle
+import pdb
 
 from Bio import SeqIO, SearchIO
 from pathlib import Path
@@ -12,7 +13,7 @@ class Accession:
         self.loci = []
         self.isplasmid = []
         self.host = ""
-        #level of assembly? -> Could not find it in gb file
+        #self.seq = ""
         
         self.nodA = False
         self.nodB = False
@@ -76,14 +77,25 @@ def parse_blast(blast_xml):
                 ids.append([query_id, query_start, query_end])
     return ids
 
-def parse_genbank(genbank_path):
+def parse_genbank(genbank_path, locus):
     gene_positions = []
     for record in SeqIO.parse(genbank_path, "genbank"):
-        for feature in record.features:
-            if feature.type == "CDS":
-                GO_function = feature.qualifiers.get("GO_function", [""])[0]
-                if GO_function:
-                    gene_positions.append((feature.location.start, feature.location.end, GO_function))
+        record_id = record.id
+        if record_id == locus:
+            for feature in record.features:
+                if feature.type == "CDS":
+                    start = feature.location.start
+                    end = feature.location.end
+                    GO_function = feature.qualifiers.get("GO_function", None)
+                    if GO_function:
+                        gene_positions.append((start, end, GO_function))
+                    else:
+                        protein = feature.qualifiers.get("product", None)
+                        if protein:
+                            gene_positions.append((start, end, protein))
+                        else:
+                            gene_positions.append((start, end, ["Unknown"]))
+            break
     return gene_positions
 
 def find_adjacent_genes(gene_positions, target_start, target_end):
@@ -91,7 +103,7 @@ def find_adjacent_genes(gene_positions, target_start, target_end):
     downstream = []
     upstream = []
     target_index = None
-
+    
     # Find the index of the target gene in sorted genes
     for i, (start, end, GO) in enumerate(sorted_genes):
         if start <= target_start and end >= target_end:
@@ -105,27 +117,37 @@ def find_adjacent_genes(gene_positions, target_start, target_end):
 
     upstream_genes = [GO for start, end, GO in upstream]
     downstream_genes = [GO for start, end, GO in downstream]
-
+    
     return upstream_genes, downstream_genes
+
+def generate_table(pickle_file, blast_xml, output_name):
+    objs = load_pickle_file(pickle_file)
+    qresults = parse_blast(blast_xml)
+    
+    with open(output_name, "w") as table:
+        table.write("Organism\tRecord\tStart\tEnd\tUpstream genes\tDownstream genes\tAccession\n")
+        for qresult in qresults:
+            for obj in objs:
+                for locus in obj.loci:
+                    if locus == qresult[0]: #qresult is a list. qresult = [id, start, end]
+                        species = obj.name
+                        accession = obj.accession
+                        genbank_path = Path(obj.path)
+                        target_start = qresult[1]
+                        target_end = qresult[2]
+                        gene_positions = parse_genbank(genbank_path, locus)
+                    
+                        if gene_positions:
+                            upstream, downstream = find_adjacent_genes(gene_positions, target_start, target_end)
+                            table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\t{upstream}\t{downstream}\t{accession}\n")
+                        else:
+                            table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\tNO CDS\tNO CDS\t{accession}\n")
+                        break
 
 if __name__ == "__main__":
     rizobia_blast = os.path.join(os.getcwd(), "rizobia-blast")
-    DUF1795_file = os.path.join(rizobia_blast, "rpstblastnResult_DUF1795.xml")
+    DUF1795_file = os.path.join(rizobia_blast, "rpstblastnResult_DUF2169.xml")
     
     pickle_file = os.path.join(os.getcwd(), "accessions_PRUEBA.pkl")
     
-    objs = load_pickle_file(pickle_file)
-    for obj in objs:
-        for query in parse_blast(DUF1795_file):
-            for locus_id in obj.loci:
-                if query[0] in locus_id:
-                    genbank_path = Path(obj.path)
-                    target_start = query[1]
-                    target_end = query[2]
-                    gene_positions = parse_genbank(genbank_path)
-                    upstream_genes, downstream_genes = find_adjacent_genes(gene_positions, target_start, target_end)
-                    print(genbank_path)
-                    print(f"Target gene start: {target_start}")
-                    print(f"Target gene end: {target_end}")
-                    print(f"Left adjacent genes: {upstream_genes}")
-                    print(f"Right adjacent genes: {downstream_genes}")
+    generate_table(pickle_file, DUF1795_file, "adjacent_genes_DUF2169.tsv")
