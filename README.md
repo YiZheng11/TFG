@@ -5,7 +5,7 @@ Código desarrollado para el trabajo de fin de grado "Identificación de efector
 
 Grado de Biotecnología en la Universidad Politécnica de Madrid
 
-Orden del proceso del trabajo:
+Orden del proceso de trabajo:
 1. db_generator.py, para descargar los genomas anotados en NCBI de _Rhizobium_, _Bradyrhizobium_, _Mesorhizobium_ y _Sinorhizobium_, y crear una base de datos para BLAST.
 2. blastanalysis.py, para cada una de los secuencias referencia (queries) que se quiera buscar.
 3. rpstblastn.py, para cada una de las secuencias de proteínas adaptadoras que se quiera buscar.
