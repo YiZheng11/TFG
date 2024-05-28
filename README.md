@@ -2,7 +2,9 @@
 _English explanation below_
 
 Código desarrollado para el trabajo de fin de grado "Identificación de efectores dependientes de sistemas de secreción tipo VI en rizobios mediante análisis genómico de adaptadores"
+
 Grado de Biotecnología en la Universidad Politécnica de Madrid
+
 Orden del proceso del trabajo:
 1. db_generator.py, para descargar los genomas anotados en NCBI de _Rhizobium_, _Bradyrhizobium_, _Mesorhizobium_ y _Sinorhizobium_, y crear una base de datos para BLAST.
 2. blastanalysis.py, para cada una de los secuencias referencia (queries) que se quiera buscar.
@@ -12,5 +14,8 @@ Orden del proceso del trabajo:
 6. find_cluster.py
 
 Code developed for the Bachelor's thesis titled "Bioinformatic strategy for searching Type VI Secretion System (T6SS) dependent effectors in rizobia by identifying adaptor proteins"
+
 BSc in Biotechnology in Polytechnic University of Madrid.
-- db_generator.py
+
+Workflow:
+1. db_generator.py
