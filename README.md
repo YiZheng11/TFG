@@ -12,7 +12,7 @@ Orden del proceso del trabajo:
 4. count_organisms.py, para analizar los resultados obtenidos de blastanalysis.py y rpstblastn.py.
 5. find_adjacent_genes.py
 6. find_cluster.py
-
+-------------------------------------------------------------------------------------------------------------------------
 Code developed for the Bachelor's thesis titled "Bioinformatic strategy for searching Type VI Secretion System (T6SS) dependent effectors in rizobia by identifying adaptor proteins"
 
 BSc in Biotechnology in Polytechnic University of Madrid.
