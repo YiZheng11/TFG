@@ -1,27 +1,28 @@
 import os
 import subprocess
 
-def multigeneblast(query_file, database, start, end, genes):
+from pathlib import Path
+
+def makedb(files, dbname):
+    if files:
+        subprocess.Popen(f"makedb {dbname} {files}", shell=True).wait()
+
+def multigeneblast(query_file, database, output):
     "Run MultiGeneBlast..."
     
-    command = ["multigeneblast"]
-    command += ["-in", query_file]
-    command += ["-db", database]
-    command += ["-from", start]
-    command += ["-to", end]
-    command += ["-genes", genes]
-
-    subprocess.run(command)
+    subprocess.Popen(f"multigeneblast -in {query_file} -db {database} -out {output}", shell=True).wait()
 
 if __name__ == "__main__":
-    query_file = os.path.join(os.getcwd(), "GCF_000442435.1.gbff")
-    database = os.path.join(os.getcwd(), "rizobia-data", "rizobia_blastdb")
+    files = "*.gbk"
+    dbname = "rizobia_mgbdb"
+    #makedb(files, dbname)
     
-    genes_accession = """WP_020919499.1, WP_020919500.1, WP_020919501.1, 
-    WP_020919503.1, WP_020919504.1, WP_020919505.1, WP_020919507.1, 
-    WP_041679311.1, WP_020919510.1, WP_041679313.1, WP_020919514.1"""
+    query_file = os.path.join(os.getcwd(), "T6SS_mgb.fasta")
     
-    start = "491148"
-    end = "515517"
-
-    multigeneblast(query_file, database, start, end, genes_accession)
+    for i in range(18):
+        n = i + 1
+        db_path = f"/home/yi/Documentos/TFG_Yi/rizobia-T6SS-mgb/rizobia-T6SS-mgb-{n}/rizobia_mgbdb"
+        output_dir = f"/home/yi/Documentos/TFG_Yi/rizobia_cluster/rizobia_cluster_{n}"
+        os.makedirs(f"{output_dir}", exist_ok=True)
+        multigeneblast(query_file, db_path, output_dir)
+        print(f"Run {n} MultiGeneBlast finished")
