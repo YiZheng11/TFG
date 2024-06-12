@@ -86,15 +86,16 @@ def parse_genbank(genbank_path, locus):
                 if feature.type == "CDS":
                     start = feature.location.start
                     end = feature.location.end
+                    strand = feature.location.strand
                     GO_function = feature.qualifiers.get("GO_function", None)
                     if GO_function:
-                        gene_positions.append((start, end, GO_function))
+                        gene_positions.append((start, end, GO_function, strand))
                     else:
                         protein = feature.qualifiers.get("product", None)
                         if protein:
-                            gene_positions.append((start, end, protein))
+                            gene_positions.append((start, end, protein, strand))
                         else:
-                            gene_positions.append((start, end, ["Unknown"]))
+                            gene_positions.append((start, end, ["Unknown"], strand))
             break
     return gene_positions
 
@@ -102,30 +103,33 @@ def find_adjacent_genes(gene_positions, target_start, target_end):
     sorted_genes = sorted(gene_positions, key=lambda x: x[0])
     downstream = []
     upstream = []
+    target = []
     target_index = None
     
     # Find the index of the target gene in sorted genes
-    for i, (start, end, GO) in enumerate(sorted_genes):
+    for i, (start, end, GO, strand) in enumerate(sorted_genes):
         if start <= target_start and end >= target_end:
             target_index = i
             break
     if target_index is not None:
-        # Get up to 3 genes upstream
-        upstream = sorted_genes[target_index-3:target_index]
-        # Get up to 3 genes downstream
-        downstream = sorted_genes[target_index+1:target_index+4]
+        # Get up to 6 genes o the left
+        upstream = sorted_genes[target_index-6:target_index]
+        # Get up to 6 genes o the right
+        downstream = sorted_genes[target_index+1:target_index+7]
+        target = sorted_genes[target_index:target_index+1]
 
-    upstream_genes = [GO for start, end, GO in upstream]
-    downstream_genes = [GO for start, end, GO in downstream]
+    upstream_genes = [(GO, strand) for start, end, GO, strand in upstream]
+    downstream_genes = [(GO, strand) for start, end, GO, strand in downstream]
+    target_gene = [(GO, strand) for start, end, GO, strand in target]
     
-    return upstream_genes, downstream_genes
+    return upstream_genes, downstream_genes, target_gene
 
 def generate_table(pickle_file, blast_xml, output_name):
     objs = load_pickle_file(pickle_file)
     qresults = parse_blast(blast_xml)
     
     with open(output_name, "w") as table:
-        table.write("Organism\tRecord\tStart\tEnd\tUpstream genes\tDownstream genes\tAccession\n")
+        table.write("Organism\tRecord\tStart\tEnd\tFunction\tStrand\tUpstream genes\tDownstream genes\tAccession\n")
         for qresult in qresults:
             for obj in objs:
                 for locus in obj.loci:
@@ -138,16 +142,19 @@ def generate_table(pickle_file, blast_xml, output_name):
                         gene_positions = parse_genbank(genbank_path, locus)
                     
                         if gene_positions:
-                            upstream, downstream = find_adjacent_genes(gene_positions, target_start, target_end)
-                            table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\t{upstream}\t{downstream}\t{accession}\n")
+                            upstream, downstream, target = find_adjacent_genes(gene_positions, target_start, target_end)
+                            if target:
+                                table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\t{target[0][0]}\t{target[0][1]}\t{upstream}\t{downstream}\t{accession}\n")
+                            else:
+                                table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\tNo info\tNo info\t{upstream}\t{downstream}\t{accession}\n")
                         else:
-                            table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\tNO CDS\tNO CDS\t{accession}\n")
+                            table.write(f"{species}\t{locus}\t{target_start}\t{target_end}\t\t\tNO CDS\tNO CDS\t{accession}\n")
                         break
 
 if __name__ == "__main__":
     rizobia_blast = os.path.join(os.getcwd(), "rizobia-blast")
     DUF1795_file = os.path.join(rizobia_blast, "rpstblastnResult_DUF2169.xml")
     
-    pickle_file = os.path.join(os.getcwd(), "accessions_PRUEBA.pkl")
+    pickle_file = os.path.join(os.getcwd(), "accessions.pkl")
     
     generate_table(pickle_file, DUF1795_file, "adjacent_genes_DUF2169.tsv")
