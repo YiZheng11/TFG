@@ -60,45 +60,68 @@ def check_location(cluster, adaptor_start, adaptor_end):
 
 def save_adaptor_info(file):
     all_adaptor = []
-    with open(f"{file}", "r") as adaptor_file:
-        adaptor_file.readline()
+    with open(file, "r") as adaptor_file:
+        adaptor_file.readline()  # Skip the header line
         for line in adaptor_file:
             adaptor = line.strip().split("\t")
             all_adaptor.append(adaptor)
     return all_adaptor
 
-if __name__ == "__main__":
-    output_file = os.path.join(os.getcwd(), "adaptor_not_in_cluster_results.tsv")
-    
-    adaptor_file = os.path.join(os.getcwd(), "adjacent_genes_DUF4123.tsv")
+def main(adaptor_file, output_file):
     adaptor_info = save_adaptor_info(adaptor_file)
-    all_records = set()
-    in_cluster = set()
+    all_records = []
+    not_in_cluster = []
+    in_cluster = []
     
-    for i in range(18):
-        n = i + 1
-        directory = os.path.join(os.getcwd(), "rizobia_cluster", f"rizobia_cluster_{n}")
-        file = os.path.join(directory, "clusterblast_output.txt")
-    
-        clusters = parse_clusters(file)
+    for adaptor_hit in adaptor_info:
+        record = adaptor_hit[1]
+        start = int(adaptor_hit[2])
+        end = int(adaptor_hit[3])
+        strand = adaptor_hit[5]
+        all_records.append(record)
         
-        for adaptor_hit in adaptor_info:
-            record = adaptor_hit[1]
-            start = int(adaptor_hit[2])
-            end = int(adaptor_hit[3])
-            strand = adaptor_hit[5]
-            all_records.add(record)
+        found_in_cluster = False
+        n = 0
+        for i in range(18):
+            n = i + 1
+            directory = os.path.join(os.getcwd(), "rizobia_cluster", f"rizobia_cluster_{n}")
+            file = os.path.join(directory, "clusterblast_output.txt")
+    
+            clusters = parse_clusters(file)
             for cluster in clusters:
                 index = cluster[2].find(" ")
-                cluster_record = (cluster[2]).strip()[index+1:-2]
+                cluster_record = cluster[2].strip()[index+1:-2]
                 if cluster_record in record:
                     nHits = check_BLAST_hits_in_cluster(cluster)
-                    adaptor_in = check_location(cluster, start, end)
-                    if adaptor_in:
-                        in_cluster.add(record)
-                
-    not_in_cluster = all_records - in_cluster
-    print(f"Total number of adaptors found initially (non repeated): {len(all_records)}")
+                    if nHits > 4:
+                        adaptor_in = check_location(cluster, start, end)
+                        if adaptor_in:
+                            found_in_cluster = True
+                            in_cluster.append((record, start, end, strand))
+                            break
+            if found_in_cluster:
+                break
+        
+        if not found_in_cluster:
+            not_in_cluster.append(adaptor_hit)
+                        
+            
+    with open(output_file, 'w') as outfile:
+        for adaptor in not_in_cluster:
+            outfile.write("\t".join(map(str, adaptor)) + "\n")
+    
+    print(f"Total number of adaptors found initially: {len(all_records)}")
     print(f"Number of those that are in a cluster: {len(in_cluster)}")
     print(f"Number of those that are NOT in a cluster: {len(not_in_cluster)}")
-    print(not_in_cluster)
+    print(f"Results for adaptors not found in any cluster saved in: {output_file}")
+
+if __name__ == "__main__":
+    DUF = "DUF2169"
+    output_dir = os.path.join(os.getcwd(), "adaptor-not-in-cluster", DUF)
+    os.makedirs(f"{output_dir}", exist_ok=True)
+    
+    output_file = os.path.join(output_dir, f"adaptor_not_in_cluster.tsv")
+    adaptor_file = os.path.join(os.getcwd(), "adjacent-genes", DUF, f"adjacent_genes.tsv")
+    
+    main(adaptor_file, output_file)
+    
