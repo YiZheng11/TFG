@@ -10,8 +10,8 @@ from pathlib import Path
 
 from Bio import Entrez
 
-Entrez.email = "yi.zheng@alumnos.upm.es" # your email please
-Entrez.api_key = "1c105008de567a0fdcc74eedb9584b2ec109"  # your API key
+Entrez.email = "" # your email please
+Entrez.api_key = ""  # your API key
 
 def get_index(number):
     "Return a NCBI summary of the assembly with id <number>"
